@@ -1,0 +1,278 @@
+<!-->Autheur Clément Bousquet </-->
+<!doctype html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8">
+        <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+        <title>Répartition des entreprises de Haute Garonne</title>
+        <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+        <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
+        <script src="https://d3js.org/d3.v5.min.js"></script>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <style>
+        .jumbotron {
+            margin-bottom:0px;
+        }
+
+        #chart {
+            background-color :white;
+        }
+
+        #button {
+            display:block;
+            padding:10px;
+            background-color:#f7f7f9;
+        }
+
+        button:focus, label:focus, input:focus {
+            outline: none;
+        }
+
+        .btn.focus {
+            box-shadow: none;
+        }
+    </style>
+    <body>
+        <div class="jumbotron">
+            <h1 class="display-4">Répartition des entreprises de Haute Garonne</h1>
+            <p class="lead">Visualisation M2 Miage IDP. Répartition par secteur d'activité.</p>
+        </div>
+        <div id="button">    
+            <p>Filtres&nbsp;<i class="fas fa-filter"></i></p>
+            <div id="monfiltre" class="btn-group" data-toggle="buttons">
+                <label class="btn btn-primary" id="label1">
+                    <input type="radio" name="options" id="option1" value="Libelle de l'activite principale de l'entreprise" checked> Activite principale de l'entreprise
+                </label>
+                <label class="btn btn-primary" id="label2">
+                    <input type="radio" name="options" id="option2" value="Caractere productif de l'etablissement"> Caractere productif de l'etablissement
+                </label>
+                <label class="btn btn-primary" id="label3">
+                    <input type="radio" name="options" id="option3" value="Libelle de la nature de l'etablissement"> Nature de l'etablissement
+                </label>
+                <label class="btn btn-primary" id="label4">
+                    <input type="radio" name="options" id="option4" value="Libelle de la nature juridique"> Nature juridique
+                </label>
+                <label class="btn btn-primary" id="label5">
+                    <input type="radio" name="options" id="option5" value="Categorie d'entreprise"> Categorie d'entreprise
+                </label>
+            </div>
+        </div>
+        <div id="chart"> 
+            <svg width=1300 height=1300>
+
+            </svg>
+        </div>
+        <div id="map">
+
+        </div>
+        <script>
+            d3.dsv(";","base-sirene.csv").then(function (data) {
+
+                const height = 1300;
+                const width = 1300;
+
+                var tooltip = d3.select("#chart")
+                .append("div")
+                .attr("id","tooltip")
+                .style("position", "absolute")
+                .style("z-index", "10")
+                .style("visibility", "hidden")
+                .style("color", "white")
+                .style("padding", "8px")
+                .style("background-color", "rgba(0, 0, 0, 0.75)")
+                .style("border-radius", "6px")
+                .style("font", "12px sans-serif")
+                .text("tooltip");
+
+                function updateSVG(data,str) {
+
+                    var nested_data = d3.nest()
+                    .key(function(d) { return d["Section"]})
+                    .entries(data);
+                    nested_data.forEach(function(d) {
+                        d.value = d.values.length;
+                        if(d.key!="") {
+                            d.name=d.key;
+                        } else {
+                            d.name="Non renseigné";
+                        }
+                        d.key!="" ? d.name=d.key : d.name="Non renseigné";
+                        var childnest = d3.nest().key(function(d){ return d[str]}).entries(d.values);
+                        childnest.forEach(function(d2) {
+                            d2.value=d2.values.length;
+                            if(d2.key!="") {
+                                d2.name=d2.key;
+                            } else {
+                                d2.name="Non renseigné";
+                            }  
+                            d2.section = d.name;
+                            delete d2.key;
+                        });
+                        d.children = childnest;
+                        delete d.key;
+                        delete d.values;
+                    });
+
+                    var data = {};
+                    data.name = "mygraph";
+                    data.fill = "white";
+                    data.children = nested_data;
+
+                    var packLayout = d3.pack()
+                    .size([1200, 1200])
+                    .padding(10)
+
+                    var rootNode = d3.hierarchy(data)
+
+                    rootNode.sum(function(d) {
+                        return d.value;
+                    });
+
+                    var pack = data => d3.pack()
+                    .size([width, height])
+                    .padding(3)
+                    (d3.hierarchy(data)
+                     .sum(d => d.value)
+                     .sort((a, b) => b.value - a.value));
+
+                    color = d3.scaleLinear()
+                        .domain([0, 5])
+                        .range(["hsl(200,100%,70%)", "hsl(250,30%,40%)"])
+                        .interpolate(d3.interpolateHcl);
+
+                    const root = pack(data);
+                    let focus = root;
+                    let view;
+
+                    const svg = d3.select('svg')
+                    .attr("viewBox", `-${width / 2} -${height / 2} ${width} ${height}`)
+                    .style("display", "block")
+                    .style("margin", "0 -14px")
+                    .style("width", "calc(100% + 28px)")
+                    .style("height", "auto")
+                    .style("background", color(0))
+                    .style("cursor", "pointer")
+                    .on("click", () => zoom(root));
+
+                    const node = svg.append("g")
+                    .selectAll("circle")
+                    .data(root.descendants().slice(1))
+                    .enter().append("circle")
+                    .attr("fill", d => d.children ? color(d.depth) : "white")
+                    //.attr("pointer-events", d => !d.children ? "none" : null)
+                    .attr("name", function(d) { return d.data.name})
+                    .attr("depth", d=> d.depth)
+                    .attr("parent", d=> d.parent.data.name)
+                    .attr("value", function(d) { return d.data.value})
+                    .attr("pourcentage", function(d)  { return (d.data.value/d.parent.data.value * 100).toFixed(2)+"%"})
+                    .on("mouseover", function(d) { 
+                        if (this.getAttribute('depth') == "2") {
+                            if (focus.parent != null) {
+                                tooltip.text(this.getAttribute('name')+" | "+this.getAttribute('value')+" | "+this.getAttribute('pourcentage'));
+                                tooltip.style("visibility", "visible");
+                            }
+                            var parent = this.getAttribute('parent');
+                            d3.selectAll("circle").filter(function() { return (this.getAttribute('name') == parent)})
+                                .attr("stroke", "#000");
+                        } else {
+                            d3.select(this).attr("stroke", "#000"); 
+                        }
+                    })
+                    .on("mousemove", function() {
+                        if (this.getAttribute('depth') == "2") {
+                            if (focus.parent != null) {
+                                return tooltip.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");
+                            }  
+                        }
+                    })
+                    .on("mouseout", function() { 
+                        if (this.getAttribute('depth') == "2") {
+                            var parent = this.getAttribute('parent');
+                            d3.selectAll("circle").filter(function() { return (this.getAttribute('name') == parent)})
+                                .attr("stroke", "null");
+                            tooltip.style("visibility", "hidden");
+                        } else {
+                            d3.select(this).attr("stroke", null);
+                        }
+                    })
+                    .on("click", function(d) {
+                        if (this.getAttribute('depth') == "2") {
+                            focus !== d.parent && (zoom(d.parent), d3.event.stopPropagation());
+                        } else {
+                            focus !== d && (zoom(d), d3.event.stopPropagation());
+                        }
+                    });
+
+                    const label = svg.append("g")
+                    .style("font", "10px sans-serif")
+                    .attr("pointer-events", "none")
+                    .attr("text-anchor", "middle")
+                    .selectAll("text")
+                    .data(root.descendants())
+                    .enter().append("text")
+                    .style("fill-opacity", d => d.parent === root ? 1 : 0)
+                    .style("display", d => d.parent === root ? "inline" : "none")
+                    .text(function(d) {
+                        if (d.depth == "2") {
+                            var text = d.data.name
+                            const context = document.createElement("canvas").getContext("2d");
+                            var measureWidth = text => context.measureText(text).width;
+                            var lineHeight = 12;
+                            var targetWidth = Math.sqrt(measureWidth(text.trim()) * lineHeight);
+                            if (targetWidth<= d.r*2) {return d.data.name};
+                        } else {
+                            return d.data.name
+                        }
+
+                    });
+
+                    zoomTo([root.x, root.y, root.r * 2]);
+
+                    function zoomTo(v) {
+                        const k = width / v[2];
+                        view = v;
+                        label.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+                        node.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+                        node.attr("r", d => d.r * k);
+                    }
+
+                    function zoom(d) {
+                        const focus0 = focus;
+                        focus = d;
+                        const transition = svg.transition()
+                        .duration(d3.event.altKey ? 7500 : 750)
+                        .tween("zoom", d => {
+                            const i = d3.interpolateZoom(view, [focus.x, focus.y, focus.r * 2]);
+                            return t => zoomTo(i(t));
+                        });
+                        label
+                            .filter(function(d) { return d.parent === focus || this.style.display === "inline"; })
+                            .transition(transition)
+                            .style("fill-opacity", d => d.parent === focus ? 1 : 0)
+                            .on("start", function(d) { if (d.parent === focus) this.style.display = "inline"; })
+                            .on("end", function(d) { if (d.parent !== focus) this.style.display = "none"; });
+                    }
+
+                    return svg.node();
+
+                }
+
+                updateSVG(data,"Libelle de l'activite principale de l'entreprise");
+
+                var $radios = $('input[name="options"]');
+                $radios.change(function() {
+                    var $checked = $radios.filter(function() {
+                        return $(this).prop('checked');
+                    });
+                    d3.selectAll('svg g').remove();
+                    updateSVG(data,$checked.val())
+                });
+
+            });
+        </script>
+    </body>
+</html>
